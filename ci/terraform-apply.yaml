@@ -1,0 +1,90 @@
+name: 'Terraform Apply - $(Date:yyMMdd)$(Rev:rr)'
+trigger:
+- none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: Foundation
+
+stages:
+  - stage: ValidatePlan
+    displayName: Validate the Terraform Plan
+    jobs:
+      - job: TerraformPlan
+        displayName: Run Terraform Plan      
+        steps:
+        - bash: |
+            terraform init \
+              -backend-config="storage_account_name=$TF_STATE_BLOB_ACCOUNT_NAME" \
+              -backend-config="container_name=$TF_STATE_BLOB_CONTAINER_NAME" \
+              -backend-config="key=$TF_STATE_BLOB_FILE" \
+              -backend-config="sas_token=$TF_STATE_BLOB_SAS_TOKEN"
+          displayName: Terraform Init
+          env:
+            TF_STATE_BLOB_ACCOUNT_NAME:   $(tf-state-blob-account)
+            TF_STATE_BLOB_CONTAINER_NAME: $(tf-state-blob-container)
+            TF_STATE_BLOB_FILE:           $(tf-state-blob-file)
+            TF_STATE_BLOB_SAS_TOKEN:      $(tf-state-sas-token)
+        - bash: |
+            terraform plan -var-file="variables.tfvars" -out=$(Build.ArtifactStagingDirectory)/tfplan
+          displayName: Terraform Plan
+          env:
+            ARM_SUBSCRIPTION_ID: $(arm-subscription-id)
+            ARM_CLIENT_ID:       $(arm-client-id)
+            ARM_CLIENT_SECRET:   $(arm-client-secret)
+            ARM_TENANT_ID:       $(arm-tenant-id)
+        # Publish the Plan file
+        - task: CopyFiles@2
+          inputs:
+            SourceFolder: '$(Build.Repository.LocalPath)'
+            Contents: |
+              **/*
+              !.git/**/*
+              !.terraform/**/*
+              !.gitignore
+              !.terraform.lock.hcl
+              !README.md
+            TargetFolder: '$(Build.ArtifactStagingDirectory)'
+        - task: PublishBuildArtifacts@1
+          inputs:
+            PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+            ArtifactName: 'drop'
+            publishLocation: 'Container'
+  - stage: DeployToTest
+    displayName: Deploy to Test
+    dependsOn:
+      - ValidatePlan
+    jobs:
+      - deployment: ApplyToTest
+        displayName: Apply Terraform to Test
+        environment: CPS-Test
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - bash: |
+                    cd $(Pipeline.Workspace)/drop
+                    pwd
+                    terraform init \
+                      -backend-config="storage_account_name=$TF_STATE_BLOB_ACCOUNT_NAME" \
+                      -backend-config="container_name=$TF_STATE_BLOB_CONTAINER_NAME" \
+                      -backend-config="key=$TF_STATE_BLOB_FILE" \
+                      -backend-config="sas_token=$TF_STATE_BLOB_SAS_TOKEN"
+                  displayName: Terraform Init
+                  env:
+                    TF_STATE_BLOB_ACCOUNT_NAME:   $(tf-state-blob-account)
+                    TF_STATE_BLOB_CONTAINER_NAME: $(tf-state-blob-container)
+                    TF_STATE_BLOB_FILE:           $(tf-state-blob-file)
+                    TF_STATE_BLOB_SAS_TOKEN:      $(tf-state-sas-token)
+                - bash: |
+                    cd $(Pipeline.Workspace)/drop
+                    pwd
+                    terraform apply -auto-approve tfplan
+                  displayName: Terraform Apply
+                  env:
+                    ARM_SUBSCRIPTION_ID: $(arm-subscription-id)
+                    ARM_CLIENT_ID:       $(arm-client-id)
+                    ARM_CLIENT_SECRET:   $(arm-client-secret)
+                    ARM_TENANT_ID:       $(arm-tenant-id)
