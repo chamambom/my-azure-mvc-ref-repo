@@ -1,13 +1,13 @@
 #Enter in your subscription IDs from the Azure tenant here.
 #Production Subscription
-subscription_prod= "c6d43a91-b813-4be8-9969-7e6537f0e5d3" # Change to Clients Production Sub ID
+subscription_prod= "x" # Change to Clients Production Sub ID
 
 
 #Shared Subscription
-subscription_shared= "c6d43a91-b813-4be8-9969-7e6537f0e5d3" # Change to Clients Shared Sub ID
+subscription_shared= "y" # Change to Clients Shared Sub ID
 
 #Development Subscription
-subscription_non_prod = "c6d43a91-b813-4be8-9969-7e6537f0e5d3" # Change to Clients Non-Prod Sub ID
+subscription_non_prod = "z" # Change to Clients Non-Prod Sub ID
 
 #Subscription End -------------------------------------------------------------
 
